@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 from openquake.calculators.extract import Extractor
 from openquake.commonlib.datastore import read
 from tqdm import tqdm
@@ -12,16 +13,16 @@ from tqdm import tqdm
 from .. import utils
 
 
-def get_hazard_curves_stats(
+def get_hcurves_stats(
     calc_id: int,
     n_procs: int,
     output_dir: Path,
     quantiles: Sequence[float] | None = None,
 ):
     """
-    Extract hazard curve realisation from the OQ database 
+    Extract hazard curve realisation from the OQ database
     and compute mean and quantiles for each IM and IM level.
-    
+
     Uses multiprocessing to speed up the extraction process.
 
     Parameters
@@ -34,7 +35,7 @@ def get_hazard_curves_stats(
         Directory to save the extracted hazard curve statistics.
     quantiles: Sequence[float] | None, optional
         List of quantiles to compute for each IM level.
-        If None, defaults to [0.05, 0.1, 0.16, 0.5, 0.84, 0.9, 0.95].   
+        If None, defaults to [0.05, 0.1, 0.16, 0.5, 0.84, 0.9, 0.95].
     """
     if quantiles is None:
         quantiles = [0.05, 0.1, 0.16, 0.5, 0.84, 0.9, 0.95]
@@ -66,9 +67,7 @@ def get_hazard_curves_stats(
     if n_procs == 1:
         hcurves = []
         for batch in tqdm(batches):
-            hcurves.append(
-                _get_hazard_curves(calc_id, batch, n_ims, n_im_levels)
-            )
+            hcurves.append(_get_hazard_curves(calc_id, batch, n_ims, n_im_levels))
     else:
         with mp.Pool(n_procs) as pool:
             hcurves = pool.starmap(
@@ -79,7 +78,7 @@ def get_hazard_curves_stats(
     hcurves = np.concatenate(hcurves, axis=0)
 
     # Compute the statistics
-    
+
     weights = weights_df.values
     for i, cur_im in tqdm(enumerate(ims), total=n_ims, desc="Processing IMs"):
         cur_data = hcurves[:, i, :]
@@ -105,9 +104,11 @@ def get_hazard_curves_stats(
         )
 
         cur_df.to_csv(
-            output_dir / f"{utils.get_im_file_format(get_im_name(cur_im))}_statistics.csv",
+            output_dir
+            / f"{utils.get_im_file_format(get_im_name(cur_im))}_statistics.csv",
             index_label="im_level",
         )
+
 
 def _get_hazard_curves(
     calc_id: int,
@@ -148,3 +149,46 @@ def get_im_name(oq_im: str) -> str:
     return oq_im
 
 
+def get_disagg_stats(
+    calc_id: int,
+    output_dir: Path,
+):
+    """
+    Extract disaggregation realisations from the OQ database,
+    and compute the weighted (LT) average, and save the result.
+
+    Parameters
+    ----------
+    calc_id: int
+        OpenQuake calculation ID
+    output_dir: Path
+        Directory to save the disaggregation data.
+    """
+    # Extract results from OQ database
+    with Extractor(calc_id) as ex:
+        rlzs_trad = ex.get(
+            "disagg?kind=TRT_Mag_Dist_Eps&spec=rlzs-traditional&site_id=0"
+        )
+    assert len(rlzs_trad.imt) == 1
+
+    rlz_weights = np.array(rlzs_trad.weights)
+    disagg = xr.DataArray(
+        rlzs_trad.array[:, :, :, :, 0, 0, :],
+        dims=["tect_type", "mag", "dist", "eps", "rlz"],
+        coords={
+            "tect_type": rlzs_trad.trt.astype(str),
+            "mag": rlzs_trad.mag,
+            "dist": rlzs_trad.dist,
+            "eps": rlzs_trad.eps,
+            "rlz": np.arange(rlz_weights.size),
+        },
+        name="disagg",
+    )
+
+    # Apply logic tree weights
+    disagg = (disagg * rlz_weights).sum("rlz")
+    assert np.isclose(disagg.sum(), 1.0)
+
+    rp = int(utils.prob_to_rp(rlzs_trad.poe[0]))
+    imf = utils.get_im_file_format(get_im_name(rlzs_trad.imt[0]))
+    disagg.to_netcdf(output_dir / f"disagg_{imf}_RP{rp}.nc")

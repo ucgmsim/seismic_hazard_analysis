@@ -8,6 +8,7 @@ import pandas as pd
 from pygmt_helper.plots import disagg_plot
 
 disagg_ffp = Path(__file__).parent.parent.parent / "data/NSHM2022/disagg_chch_nshm.csv"
+output_ffp = Path("/Users/claudy/dev/work/tmp/disagg_plots/test_nshm.png")
 
 # Load the data & rename columns
 disagg_df = pd.read_csv(disagg_ffp, skiprows=1)
@@ -63,7 +64,7 @@ disagg_plot(
         "Subduction Interface": (None, "orange"),
         "Subduction Intraslab": (None, "red"),
     },
-    Path("/Users/claudy/dev/work/tmp/disagg_plots/test.png"),
+    output_ffp,
 )
 
 ### Epsilon color coding
@@ -85,5 +86,3 @@ disagg_plot(
 #     category_specs,
 #     Path("/Users/claudy/dev/work/tmp/disagg_plots/test.png"),
 # )
-
-print("wtf")

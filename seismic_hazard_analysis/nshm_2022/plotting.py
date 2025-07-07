@@ -1,17 +1,24 @@
 import io
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+import xarray as xr
 
+from pygmt_helper import plots
 from nshmdb.nshmdb import NSHMDB
 from qcore import geo
 
 try:
     from pygmt_helper import plotting
+
     HAS_PYGMT = True
 except ImportError:
     plotting = None
     HAS_PYGMT = False
+
+from . import utils
+
 
 def context_plot(
     site_lon: float,
@@ -33,6 +40,9 @@ def context_plot(
         Latitude of the site.
     region_expanse : float
         The size of the region to plot around the site in km.
+        E.g. if set to 100km, the region is 100km to the
+        north, south, east, and west of the site,
+        with the site in the center.
     nshm_source_db_ffp : Path
         Path to the NSHM source database file.
     nzgmdb_event_table_ffp : Path
@@ -41,8 +51,9 @@ def context_plot(
         Path to save the output figure.
     """
     if not HAS_PYGMT:
-        raise ImportError("pygmt_helper is not installed. " \
-        "Please install it to use this function.")
+        raise ImportError(
+            "pygmt_helper is not installed. " "Please install it to use this function."
+        )
 
     db = NSHMDB(nshm_source_db_ffp)
     event_df = pd.read_csv(
@@ -72,13 +83,10 @@ def context_plot(
     region = (min_lon, max_lon, min_lat, max_lat)
 
     # Load the mapd data
-    map_data = plotting.NZMapData.load(high_res_topo=True)
-    # map_data = None
 
     # Create the figure
     fig = plotting.gen_region_fig(
         region=region,
-        map_data=map_data,
         plot_kwargs={
             "topo_cmap": "geo",
             "topo_cmap_inc": 25,
@@ -96,6 +104,7 @@ def context_plot(
             MAP_FRAME_AXES="WSne",
         ),
         plot_roads=True,
+        high_res_topo=True,
     )
 
     # Plot the source geometries
@@ -150,7 +159,7 @@ def context_plot(
 
     legend_spec = io.StringIO()
     legend_spec.write("H 12p,Helvetica-Bold Historic Events\n")
-    legend_spec.write("D 0.1i 1p\n") 
+    legend_spec.write("D 0.1i 1p\n")
     legend_spec.write("S 0.1i c 0.15c blue 0.05p,black 0.4i Magnitude 4.0-5.0\n")
     legend_spec.write("S 0.1i c 0.20c orange 0.05p,black 0.4i Magnitude 5.0-6.0\n")
     legend_spec.write("S 0.1i c 0.25c red 0.05p,black 0.4i Magnitude 6.0+\n")
@@ -167,3 +176,62 @@ def context_plot(
     )
 
 
+def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: Path):
+    """
+    Creates a disaggregation 3D bar plot
+
+    Parameters
+    ----------
+    disagg : xr.DataArray
+        The disaggregation data to plot.
+        It should have dimensions ['mag', 'dist']
+        + ['tect_type'] or ['eps'],
+        depending on the `plot_type`.
+    plot_type : utils.DisaggPlotType
+        The type of disaggregation plot to create.
+    out_ffp : Path
+        The file path where the plot will be saved.
+    """
+    z_col = utils.PLOT_TYPE_COL_MAPPING[plot_type]
+
+    disagg_df = (
+        disagg.to_dataframe().reset_index().rename(columns={"disagg": "contribution"})
+    )
+    disagg_df["contribution"] = disagg_df["contribution"] * 100
+
+    disagg_df = (
+        disagg_df.groupby(["mag", "dist", z_col])["contribution"].sum().reset_index()
+    )
+
+    mag_bin_width = np.unique(np.diff(np.sort(disagg_df.mag.unique())))
+    assert mag_bin_width.size == 1, "Magnitude bin widths are not uniform."
+    mag_bin_width = mag_bin_width.item()
+
+    dist_bin_width = np.unique(np.diff(np.sort(disagg_df.dist.unique())))
+    assert dist_bin_width.size == 1, "Distance bin widths are not uniform."
+    dist_bin_width = dist_bin_width.item()
+
+    disagg_df["mag_bin_width"] = mag_bin_width
+    disagg_df["dist_bin_width"] = dist_bin_width
+
+    min_mag = disagg_df.mag.min() - mag_bin_width / 2
+    max_mag = disagg_df.mag.max() + mag_bin_width / 2
+    min_dist = disagg_df.dist.min() - dist_bin_width / 2
+    max_dist = disagg_df.dist.max() + dist_bin_width / 2
+
+    if plot_type == utils.DisaggPlotType.TectonicType:
+        category_specs = {
+            "Active Shallow Crust": (None, "blue"),
+            "Subduction Interface": (None, "orange"),
+            "Subduction Intraslab": (None, "red"),
+        }
+    else:
+        raise NotImplementedError()
+
+    plots.disagg_plot(
+        disagg_df,
+        (min_dist, max_dist, min_mag, max_mag),
+        z_col,
+        category_specs,
+        out_ffp,
+    )

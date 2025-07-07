@@ -1,11 +1,24 @@
 import json
 from pathlib import Path
+import enum
 
 import geojson
 import numpy as np
 from turfpy.measurement import points_within_polygon
 
 BACKARC_JSON_FFP = Path(__file__).parent.parent.parent / "data/NSHM2022" / "backarc.json" 
+
+class DisaggPlotType(enum.StrEnum):
+    """
+    Enum for the different types of disaggregation plots.
+    """
+    TectonicType = "tectonic_type"
+    Epsilon = "epsilon"
+
+PLOT_TYPE_COL_MAPPING = {
+    DisaggPlotType.TectonicType: "tect_type",
+    DisaggPlotType.Epsilon: "eps",
+}
 
 def get_backarc_mask(locs: np.ndarray):
     """
@@ -38,3 +51,4 @@ def get_backarc_mask(locs: np.ndarray):
     backarc_mask[backarc_ind] = True
 
     return backarc_mask
+

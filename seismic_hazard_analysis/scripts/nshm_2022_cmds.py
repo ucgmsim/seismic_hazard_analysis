@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import typer
+import xarray as xr
 
 import seismic_hazard_analysis as sha
 
@@ -24,7 +25,7 @@ def get_hcurve_stats(
     Extract hazard curve realisation from the OQ database,
     and computes mean and quantiles for each IM and IM level.
     """
-    sha.nshm_2022.get_hazard_curves_stats(calc_id, n_procs, output_dir)
+    sha.nshm_2022.get_hcurves_stats(calc_id, n_procs, output_dir)
 
 
 @app.command("compute-uhs")
@@ -104,7 +105,7 @@ def get_rps_im_values(
     excd_rates = [sha.utils.rp_to_prob(cur_rp) for cur_rp in rps]
 
     im_values = sha.utils.exceedance_to_im(
-        excd_rates, 
+        excd_rates,
         mean_hcurve.index.values,
         mean_hcurve.values,
     )
@@ -112,6 +113,63 @@ def get_rps_im_values(
     for cur_rp, cur_im_value in zip(rps, im_values):
         print(f"{im} - {cur_rp} years: {cur_im_value:.6f}")
 
+
+@app.command("extract-disagg")
+def extract_disagg(
+    calc_id: int = typer.Argument(..., help="OpenQuake calculation ID"),
+    output_dir: Path = typer.Argument(
+        ..., help="Directory to save the extracted disaggregation data"
+    ),
+):
+    """Extract diaggregation from OQ database"""
+    sha.nshm_2022.get_disagg_stats(calc_id, output_dir)
+
+
+@app.command("context-plot")
+def context_plot(
+    site_lon: float = typer.Argument(..., help="Longitude of the site"),
+    site_lat: float = typer.Argument(..., help="Latitude of the site"),
+    region_expanse: float = typer.Argument(
+        ..., help="Size of the region to plot around the site in km"
+    ),
+    nshm_source_db_ffp: Path = typer.Argument(
+        ..., help="Path to the NSHM source database file"
+    ),
+    nzgmdb_event_table_ffp: Path = typer.Argument(
+        ..., help="Path to the NZGMDB event table CSV file"
+    ),
+    out_ffp: Path = typer.Argument(..., help="Path to save the output figure"),
+):
+    """Plot context for a given site with nearby historic events and source geometries."""
+    sha.nshm_2022.context_plot(
+        site_lon,
+        site_lat,
+        region_expanse,
+        nshm_source_db_ffp,
+        nzgmdb_event_table_ffp,
+        out_ffp,
+    )
+
+
+@app.command("disagg-plot")
+def disagg_plot(
+    disagg_results_ffp: list[Path] = typer.Argument(
+        ..., help="Path to the disaggregation result netCDF files"
+    ),
+    plot_type: sha.nshm_2022.DisaggPlotType = typer.Argument(
+        ..., help="Type of disaggregation plot to create", show_choices=True
+    ),
+    output_dir: Path = typer.Argument(
+        ..., help="Directory to save the disaggregation plots"
+    ),
+):
+    """Create a disaggregation 3D bar plot"""
+    for ffp in disagg_results_ffp:
+        sha.nshm_2022.disagg_plot(
+            xr.open_dataarray(ffp),
+            plot_type,
+            output_dir / f"{ffp.stem}_{plot_type}.png",
+        )
 
 
 if __name__ == "__main__":
