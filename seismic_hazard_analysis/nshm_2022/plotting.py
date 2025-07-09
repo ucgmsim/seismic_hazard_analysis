@@ -5,12 +5,11 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from pygmt_helper import plots
 from nshmdb.nshmdb import NSHMDB
 from qcore import geo
 
 try:
-    from pygmt_helper import plotting
+    from pygmt_helper import plots, plotting
 
     HAS_PYGMT = True
 except ImportError:
@@ -203,21 +202,49 @@ def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: 
         disagg_df.groupby(["mag", "dist", z_col])["contribution"].sum().reset_index()
     )
 
-    mag_bin_width = np.unique(np.diff(np.sort(disagg_df.mag.unique())))
-    assert mag_bin_width.size == 1, "Magnitude bin widths are not uniform."
-    mag_bin_width = mag_bin_width.item()
+    # Magnitude bin edges are given
+    # Can be non-uniform
+    if (mag_bin_edges := disagg.attrs.get("mag_bin_edges", None)) is not None:
+        # mag_bin_width = np.diff(mag_bin_edges)
+        raise NotImplementedError()
+    # Constant magnitude bin width
+    else:
+        if (mag_bin_width := disagg.attrs.get("mag_bin_width", None)) is not None:
+            disagg_df["mag_bin_width"] = mag_bin_width
+        else:
+            mag_bin_width = np.diff(np.sort(disagg_df.mag.unique()))
+            assert np.allclose(
+                mag_bin_width, mag_bin_width[0]
+            ), "Magnitude bin widths are not uniform."
+            mag_bin_width = mag_bin_width[0]
+        
+        min_mag = disagg_df.mag.min() - mag_bin_width / 2
+        max_mag = disagg_df.mag.max() + mag_bin_width / 2
 
-    dist_bin_width = np.unique(np.diff(np.sort(disagg_df.dist.unique())))
-    assert dist_bin_width.size == 1, "Distance bin widths are not uniform."
-    dist_bin_width = dist_bin_width.item()
+    # Distance bin edges are given
+    # Can be non-uniform
+    if (dist_bin_edges := disagg.attrs.get("dist_bin_edges", None)) is not None:
+        dist_bin_width = np.diff(dist_bin_edges)
+        dist_bin_centres = (dist_bin_edges[:-1] + dist_bin_edges[1:]) / 2
+        assert np.allclose(dist_bin_centres, disagg_df.dist.unique())
+        disagg_df["dist_bin_width"] = disagg_df["dist"].map(
+            dict(zip(dist_bin_centres, dist_bin_width))
+        )
 
-    disagg_df["mag_bin_width"] = mag_bin_width
-    disagg_df["dist_bin_width"] = dist_bin_width
-
-    min_mag = disagg_df.mag.min() - mag_bin_width / 2
-    max_mag = disagg_df.mag.max() + mag_bin_width / 2
-    min_dist = disagg_df.dist.min() - dist_bin_width / 2
-    max_dist = disagg_df.dist.max() + dist_bin_width / 2
+        min_dist, max_dist = dist_bin_edges[0], dist_bin_edges[-1]
+    # Constant distance bin width
+    else:
+        if (dist_bin_width := disagg.attrs.get("dist_bin_width", None)) is not None:
+            disagg_df["dist_bin_width"] = dist_bin_width
+        else:
+            dist_bin_width = np.diff(np.sort(disagg_df.dist.unique()))
+            assert np.allclose(
+                dist_bin_width, dist_bin_width[0]
+            ), "Distance bin widths are not uniform."
+            dist_bin_width = dist_bin_width.item()
+        
+        min_dist = disagg_df.dist.min() - dist_bin_width / 2
+        max_dist = disagg_df.dist.max() + dist_bin_width / 2
 
     if plot_type == utils.DisaggPlotType.TectonicType:
         category_specs = {

@@ -120,9 +120,10 @@ def extract_disagg(
     output_dir: Path = typer.Argument(
         ..., help="Directory to save the extracted disaggregation data"
     ),
+    disagg_kind : str = typer.Option("TRT_Mag_Dist_Eps", help="Kind of disaggregation to extract")
 ):
     """Extract diaggregation from OQ database"""
-    sha.nshm_2022.get_disagg_stats(calc_id, output_dir)
+    sha.nshm_2022.get_disagg_stats(calc_id, output_dir, disagg_kind=disagg_kind)
 
 
 @app.command("context-plot")

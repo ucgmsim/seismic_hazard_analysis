@@ -152,6 +152,7 @@ def get_im_name(oq_im: str) -> str:
 def get_disagg_stats(
     calc_id: int,
     output_dir: Path,
+    disagg_kind: str = "TRT_Mag_Dist_Eps",
 ):
     """
     Extract disaggregation realisations from the OQ database,
@@ -163,32 +164,54 @@ def get_disagg_stats(
         OpenQuake calculation ID
     output_dir: Path
         Directory to save the disaggregation data.
+    kind: str
+        The kind of disaggregation to extract, e.g., "TRT_Mag_Dist_Eps".
+        Default is "TRT_Mag_Dist_Eps".
     """
     # Extract results from OQ database
     with Extractor(calc_id) as ex:
-        rlzs_trad = ex.get(
-            "disagg?kind=TRT_Mag_Dist_Eps&spec=rlzs-traditional&site_id=0"
-        )
+        rlzs_trad = ex.get(f"disagg?kind={disagg_kind}&spec=rlzs-traditional&site_id=0")
+
+    with read(calc_id) as ds:
+        oq_params = ds["oqparam"]
+
     assert len(rlzs_trad.imt) == 1
+    assert len(rlzs_trad.poe) == 1
 
     rlz_weights = np.array(rlzs_trad.weights)
+    dims = rlzs_trad.shape_descr[:-2]  # Exclude 'imt' and 'poe'
+    coords = {
+        cur_dim: (
+            rlzs_trad[cur_dim].astype(str) if cur_dim == "trt" else rlzs_trad[cur_dim]
+        )
+        for cur_dim in dims
+    }
+    coords["rlz"] = np.arange(rlz_weights.size)
+
     disagg = xr.DataArray(
-        rlzs_trad.array[:, :, :, :, 0, 0, :],
-        dims=["tect_type", "mag", "dist", "eps", "rlz"],
-        coords={
-            "tect_type": rlzs_trad.trt.astype(str),
-            "mag": rlzs_trad.mag,
-            "dist": rlzs_trad.dist,
-            "eps": rlzs_trad.eps,
-            "rlz": np.arange(rlz_weights.size),
-        },
+        rlzs_trad.array[..., 0, 0, :],
+        dims=dims + ["rlz"],
+        coords=coords,
         name="disagg",
     )
+    disagg = disagg.rename({"trt": "tect_type"})
 
     # Apply logic tree weights
     disagg = (disagg * rlz_weights).sum("rlz")
     assert np.isclose(disagg.sum(), 1.0)
 
-    rp = int(utils.prob_to_rp(rlzs_trad.poe[0]))
+    # Add metadata
+    if (mag_bin_edges := oq_params.disagg_bin_edges.get("mag", None)) is not None:
+        disagg.attrs["mag_bin_edges"] = mag_bin_edges
+    else:
+        disagg.attrs["mag_bin_width"] = oq_params.mag_bin_width
+    if (dist_bin_edges := oq_params.disagg_bin_edges.get("dist", None)) is not None:
+        disagg.attrs["dist_bin_edges"] = dist_bin_edges
+    else:
+        disagg.attrs["dist_bin_width"] = oq_params.dist_bin_width
+    if (eps_bin_edges := oq_params.disagg_bin_edges.get("eps", None)) is not None:
+        disagg.attrs["eps_bin_edges"] = eps_bin_edges
+
+    rp = int(np.round(utils.prob_to_rp(rlzs_trad.poe[0])))
     imf = utils.get_im_file_format(get_im_name(rlzs_trad.imt[0]))
     disagg.to_netcdf(output_dir / f"disagg_{imf}_RP{rp}.nc")
