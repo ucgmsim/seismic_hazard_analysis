@@ -155,8 +155,8 @@ def get_disagg_stats(
     disagg_kind: str = "TRT_Mag_Dist_Eps",
 ):
     """
-    Extract disaggregation realisations from the OQ database,
-    and compute the weighted (LT) average, and save the result.
+    Extract mean disaggregation from the OQ database,
+    and save as a netCDF file (xr.DataArray).
 
     Parameters
     ----------
@@ -170,35 +170,35 @@ def get_disagg_stats(
     """
     # Extract results from OQ database
     with Extractor(calc_id) as ex:
-        rlzs_trad = ex.get(f"disagg?kind={disagg_kind}&spec=rlzs-traditional&site_id=0")
+        mean_disagg = ex.get(f"disagg?kind={disagg_kind}&spec=stats&site_id=0&imt=PGA&poe_id=0")
 
     with read(calc_id) as ds:
         oq_params = ds["oqparam"]
 
-    assert len(rlzs_trad.imt) == 1
-    assert len(rlzs_trad.poe) == 1
+    assert len(mean_disagg.imt) == 1 and len(mean_disagg.poe) == 1
+    assert np.isclose(oq_params.investigation_time, 1)
 
-    rlz_weights = np.array(rlzs_trad.weights)
-    dims = rlzs_trad.shape_descr[:-2]  # Exclude 'imt' and 'poe'
+    dims = mean_disagg.shape_descr[:-2]  # Exclude 'imt' and 'poe'
     coords = {
         cur_dim: (
-            rlzs_trad[cur_dim].astype(str) if cur_dim == "trt" else rlzs_trad[cur_dim]
+            mean_disagg[cur_dim].astype(str) if cur_dim == "trt" else mean_disagg[cur_dim]
         )
         for cur_dim in dims
     }
-    coords["rlz"] = np.arange(rlz_weights.size)
 
     disagg = xr.DataArray(
-        rlzs_trad.array[..., 0, 0, :],
-        dims=dims + ["rlz"],
+        mean_disagg.array[..., 0, 0],
+        dims=dims,
         coords=coords,
         name="disagg",
     )
     disagg = disagg.rename({"trt": "tect_type"})
 
-    # Apply logic tree weights
-    disagg = (disagg * rlz_weights).sum("rlz")
-    assert np.isclose(disagg.sum(), 1.0)
+    # Convert to rates
+    disagg = -np.log(1 - disagg) 
+
+    # Convert to contribution percentages
+    disagg = disagg / disagg.sum()
 
     # Add metadata
     if (mag_bin_edges := oq_params.disagg_bin_edges.get("mag", None)) is not None:
@@ -212,6 +212,6 @@ def get_disagg_stats(
     if (eps_bin_edges := oq_params.disagg_bin_edges.get("eps", None)) is not None:
         disagg.attrs["eps_bin_edges"] = eps_bin_edges
 
-    rp = int(np.round(utils.prob_to_rp(rlzs_trad.poe[0])))
-    imf = utils.get_im_file_format(get_im_name(rlzs_trad.imt[0]))
+    rp = int(np.round(utils.prob_to_rp(mean_disagg.poe[0])))
+    imf = utils.get_im_file_format(get_im_name(mean_disagg.imt[0]))
     disagg.to_netcdf(output_dir / f"disagg_{imf}_RP{rp}.nc")

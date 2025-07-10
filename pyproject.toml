@@ -18,6 +18,9 @@ dependencies = {file = ["requirements.txt"]}
 [tool.setuptools.packages.find]
 include = ["seismic_hazard_analysis"]
 
+[tool.ruff]
+target-version = "py312"
+
 [tool.ruff.lint]
 extend-select = [
   # isort imports

@@ -10,9 +10,11 @@ Would not recommend trying to run on a standard desktop, `hypocentre` is general
 - Create a run directoy
 - Add the NSHM GMM logic tree file,  `NZ_NSHM_GMM_LT_final_EE.xml`
 - Add the source model file, `source_model.xml`
-- Add the `source_definitions` folder, generally via a symbolic link
+- Add the `source_definitions` folder (generally via a symbolic link)
 - Add the `site.csv` 
 - Add the `hazard_job.ini`
+
+See [here](https://www.dropbox.com/scl/fo/u4l15xrz10vsmbg6jqhtk/ABSTE60eiLjyTg9Wey0peDU?rlkey=56xvazcl8lys1wx4hfg5bt4tj&st=ssue8t12&dl=0) for the GMM logic tree, source model file and source definitions folder.
 
 **OQ Engine Version**
 Version 3.23.2 works correctly, there was some issues with earlier version so would not recommend using those.
@@ -25,7 +27,109 @@ lon,lat,vs30,z1pt0,z2pt5,backarc
 
 **Hazard Configuration**
 All configuration is done in the `hazard_job.ini` file, an example is shown below:
+```ini
+[general]
+description = Hazard curves,Granuldar configs GSIM LT final EE
+random_seed = 25
+calculation_mode = classical
+ps_grid_spacing = 30
+
+[logic_tree]
+number_of_logic_tree_samples = 0
+
+[erf]
+rupture_mesh_spacing = 4
+width_of_mfd_bin = 0.1
+complex_fault_mesh_spacing = 10.0
+area_source_discretization = 10.0
+
+[site_params]
+site_model_file = sites.csv
+
+[calculation]
+source_model_logic_tree_file = ./source_model.xml
+gsim_logic_tree_file = ./NZ_NSHM_GMM_LT_final_EE.xml
+investigation_time = 1.0
+truncation_level = 4
+maximum_distance = {'Active Shallow Crust': [(4.0, 0), (5.0, 100.0), (6.0, 200.0), (9.5, 300.0)],
+        'Subduction Interface': [(5.0, 0), (6.0, 200.0), (10, 500.0)],
+        'Subduction Intraslab': [(5.0, 0), (6.0, 200.0), (10, 500.0)]}
+intensity_measure_types_and_levels  = {"PGA": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(0.1)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(0.2)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(0.3)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(0.4)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(0.5)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(0.7)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(1.0)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(1.5)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(2.0)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(3.0)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(4.0)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(5.0)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(6.0)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(7.5)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "SA(10.0)": [0.0001, 0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.5, 4, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]}
+
+[output]
+individual_rlzs = true
 ```
 
+The only options that should be changed are:
+ - `site_model_file`, `source_model_logic_tree_file` and `gsim_logic_tree_file`  if your those files have different names or location
+ - `intensity_measure_types_and_levels` to change the IM levels for which hazard is calculated. Note that increasing the number of IM levels which increase run time and memory consumption
+ - `number_of_logic_tree_samples` to change the number of logic tree branches used, zero means all, any other number results in subsampling of the logic tree. Will reduce run-time, at the cost of getting exact results.
+
+ ### Running
+With the setup complete, the OQ job is then started with
+`oq engine --run hazard_job.ini -p use_rates=true -p max_potential_paths=1000000`
+This can take several hours to complete, ensure the job is started in screen or tmux
+
+Once the job is complete, make note of the `calc_id` this is needed for the next step.
+I tend to symlink (`ln -s`) the datastore into the run-directoy so I know which `calc_id` belongs to run.
+
+Note: The resulting OQ datastore can be quite large (10s of GB)
+
+### Hazard Curve Stats Extraction
+The next step is to compute the mean hazard curve, and quantiles.
+This is done via the `nshm_2022_cmds` script.
+
+The specific command of interest is `get-hcurve-stats`, which has the following arguments/options:
+(Run `python nshm_2022_cmds.py get-hcurve-stats --help` to get this)
 ```
+ Usage: nshm_2022_cmds.py get-hcurve-stats [OPTIONS] CALC_ID [N_PROCS]
+                                           OUTPUT_DIR
+
+ Extract hazard curve realisation from the OQ database, and computes mean and quantiles for each IM and
+ IM level.
+
+
+╭─ Arguments ───────────────────────────────────────────────────────────────────────────────────────────╮
+│ *    calc_id         INTEGER    OpenQuake calculation ID [default: None] [required]                   │
+│      n_procs         [N_PROCS]  Number of processes to use for parallel extraction [default: 8]       │
+│ *    output_dir      PATH       Directory to save the extracted hazard curve statistics               │
+│                                 [default: None]                                                       │
+│                                 [required]                                                            │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ─────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --help          Show this message and exit.                                                           │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+Running this produces a statistics csv file for each IM, containing the mean and quantiles for the different IM levels.
+
+### UHS
+Uniform hazard can also be computed, assuming that pSA is specified in the `hazard_job.ini`, using the `compute-uhs` command.
+
+```
+ Usage: nshm_2022_cmds.py compute-uhs [OPTIONS] HCURVE_STATS_DIR OUTPUT_FFP
+
+ Compute the Uniform Hazard Spectrum (UHS) from the hazard curve statistics.
+
+
+╭─ Arguments ───────────────────────────────────────────────────────────────────────────────────────────╮
+│ *    hcurve_stats_dir      PATH  Directory containing the hazard curve statistics [default: None]     │
+│                                  [required]                                                           │
+│ *    output_ffp            PATH  File path to save the computed UHS DataFrame [default: None]         │
+│                                  [required]                                                           │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ─────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --excd-rates        FLOAT  List of exceedance rates to compute UHS for. One of `excd_rates` or `rps`  │
+│                            must be provided.                                                          │
+│                            [default: None]                                                            │
+│ --rps               FLOAT  List of return periods to compute UHS for. One of `excd_rates` or `rps`    │
+│                            must be provided.                                                          │
+│                            [default: None]                                                            │
+│ --help                     Show this message and exit.                                                │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+
+ 
+
 
