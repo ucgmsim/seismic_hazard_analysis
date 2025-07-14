@@ -154,7 +154,7 @@ def context_plot(
 
 @app.command("disagg-plot")
 def disagg_plot(
-    disagg_results_ffp: list[Path] = typer.Argument(
+    disagg_results_ffps: list[Path] = typer.Argument(
         ..., help="Path to the disaggregation result netCDF files"
     ),
     plot_type: sha.nshm_2022.DisaggPlotType = typer.Argument(
@@ -165,7 +165,7 @@ def disagg_plot(
     ),
 ):
     """Create a disaggregation 3D bar plot"""
-    for ffp in disagg_results_ffp:
+    for ffp in disagg_results_ffps:
         sha.nshm_2022.disagg_plot(
             xr.open_dataarray(ffp),
             plot_type,

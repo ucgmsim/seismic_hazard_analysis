@@ -3,7 +3,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import xarray as xr
+from matplotlib import colors as mcolors
 
 from nshmdb.nshmdb import NSHMDB
 from qcore import geo
@@ -13,7 +15,7 @@ try:
 
     HAS_PYGMT = True
 except ImportError:
-    plotting = None
+    plotting, plots = None, None
     HAS_PYGMT = False
 
 from . import utils
@@ -175,7 +177,13 @@ def context_plot(
     )
 
 
-def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: Path):
+def disagg_plot(
+    disagg: xr.DataArray,
+    plot_type: utils.DisaggPlotType,
+    out_ffp: Path | None = None,
+    verbose: bool = True,
+    mag_rounding: bool = True,
+):
     """
     Creates a disaggregation 3D bar plot
 
@@ -190,7 +198,18 @@ def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: 
         The type of disaggregation plot to create.
     out_ffp : Path
         The file path where the plot will be saved.
+    verbose : bool, default=True
+        If `True`, prints progress messages during plotting.
+    mag_rounding : bool, default=True
+        If `True`, rounds the magnitude values to one decimal place.
+        This is useful when re-producing NSHM disagg results,
+        as these use mag_bin_width = 0.1999
     """
+    if not HAS_PYGMT:
+        raise ImportError(
+            "pygmt_helper is not installed. " "Please install it to use this function."
+        )
+
     z_col = utils.PLOT_TYPE_COL_MAPPING[plot_type]
 
     disagg_df = (
@@ -202,6 +221,7 @@ def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: 
         disagg_df.groupby(["mag", "dist", z_col])["contribution"].sum().reset_index()
     )
 
+    uniform_mag_bin_width = None
     # Magnitude bin edges are given
     # Can be non-uniform
     if (mag_bin_edges := disagg.attrs.get("mag_bin_edges", None)) is not None:
@@ -217,10 +237,28 @@ def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: 
                 mag_bin_width, mag_bin_width[0]
             ), "Magnitude bin widths are not uniform."
             mag_bin_width = mag_bin_width[0]
-        
-        min_mag = disagg_df.mag.min() - mag_bin_width / 2
-        max_mag = disagg_df.mag.max() + mag_bin_width / 2
 
+        # Handle cases where magnitude bin width is 0.1999 (or similar)
+        if mag_rounding:
+            min_mag = np.round(disagg_df.mag.min() - mag_bin_width / 2, 1)
+            max_mag = np.round(disagg_df.mag.max() + mag_bin_width / 2, 1)
+            uniform_mag_bin_width = np.round(mag_bin_width, 1)
+        else:
+            min_mag = disagg_df.mag.min() - mag_bin_width / 2
+            max_mag = disagg_df.mag.max() + mag_bin_width / 2
+            uniform_mag_bin_width = mag_bin_width
+
+    # Set the major and minor ticks for magnitude
+    plot_kwargs = {}
+    if uniform_mag_bin_width:
+        if np.ceil((max_mag - min_mag) / uniform_mag_bin_width) > 10:
+            plot_kwargs["mag_major_tick"] = uniform_mag_bin_width * 2
+            plot_kwargs["mag_minor_tick"] = uniform_mag_bin_width
+        else:
+            plot_kwargs["mag_major_tick"] = uniform_mag_bin_width
+            plot_kwargs["mag_minor_tick"] = uniform_mag_bin_width / 2
+
+    uniform_dist_bin_width = None
     # Distance bin edges are given
     # Can be non-uniform
     if (dist_bin_edges := disagg.attrs.get("dist_bin_edges", None)) is not None:
@@ -232,6 +270,11 @@ def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: 
         )
 
         min_dist, max_dist = dist_bin_edges[0], dist_bin_edges[-1]
+
+        # Check if distance bin widths are uniform
+        if np.allclose(dist_bin_width, dist_bin_width[0]):
+            uniform_dist_bin_width = dist_bin_width[0]
+            
     # Constant distance bin width
     else:
         if (dist_bin_width := disagg.attrs.get("dist_bin_width", None)) is not None:
@@ -242,9 +285,20 @@ def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: 
                 dist_bin_width, dist_bin_width[0]
             ), "Distance bin widths are not uniform."
             dist_bin_width = dist_bin_width.item()
-        
+
         min_dist = disagg_df.dist.min() - dist_bin_width / 2
         max_dist = disagg_df.dist.max() + dist_bin_width / 2
+
+        uniform_dist_bin_width = dist_bin_width
+
+    # Set the major and minor ticks for distance
+    if uniform_dist_bin_width:
+        if np.ceil((max_dist - min_dist) / uniform_dist_bin_width) > 10:
+            plot_kwargs["dist_major_tick"] = dist_bin_width[0] * 2
+            plot_kwargs["dist_minor_tick"] = dist_bin_width[0] 
+        else:
+            plot_kwargs["dist_major_tick"] = dist_bin_width[0]
+            plot_kwargs["dist_minor_tick"] = dist_bin_width[0] / 2
 
     if plot_type == utils.DisaggPlotType.TectonicType:
         category_specs = {
@@ -253,12 +307,30 @@ def disagg_plot(disagg: xr.DataArray, plot_type: utils.DisaggPlotType, out_ffp: 
             "Subduction Intraslab": (None, "red"),
         }
     else:
-        raise NotImplementedError()
+        # User specified epsilon bins
+        if (eps_bin_edges := disagg.attrs.get("eps_bin_edges", None)) is not None:
+            assert np.all(np.sort(eps_bin_edges) == eps_bin_edges)
+            eps_bin_centres = np.sort(disagg_df.eps.unique())
+            assert eps_bin_edges.size == eps_bin_centres.size + 1
+            category_colors = sns.color_palette("bwr", n_colors=eps_bin_centres.size)
+            category_specs = {cur_eps: (_get_epsilon_legend_entry(i, eps_bin_edges), mcolors.to_hex(category_colors[i])) for i, cur_eps in enumerate(eps_bin_centres)}
+        else:
+            raise NotImplementedError()
 
-    plots.disagg_plot(
+
+    return plots.disagg_plot(
         disagg_df,
         (min_dist, max_dist, min_mag, max_mag),
+        plots.DisaggPlotType(plot_type),
         z_col,
         category_specs,
-        out_ffp,
+        output_ffp=out_ffp,
+        verbose=verbose,
+        plot_kwargs=plot_kwargs,
     )
+
+def _get_epsilon_legend_entry(i: int, eps_bin_edges: np.ndarray) -> str:
+    """
+    Returns a legend entry for the given epsilon bin index.
+    """
+    return f"@[{eps_bin_edges[i]:5.2f} < \\epsilon < {eps_bin_edges[i+1]:5.2f}@["

@@ -168,20 +168,35 @@ def get_disagg_stats(
         The kind of disaggregation to extract, e.g., "TRT_Mag_Dist_Eps".
         Default is "TRT_Mag_Dist_Eps".
     """
-    # Extract results from OQ database
-    with Extractor(calc_id) as ex:
-        mean_disagg = ex.get(f"disagg?kind={disagg_kind}&spec=stats&site_id=0&imt=PGA&poe_id=0")
-
     with read(calc_id) as ds:
         oq_params = ds["oqparam"]
 
-    assert len(mean_disagg.imt) == 1 and len(mean_disagg.poe) == 1
+    im_levels = ds["oqparam"].iml_disagg
+    if len(ims := list(im_levels.keys())) != 1:
+        raise ValueError(
+            f"Expected exactly one IM for disaggregation, got {len(ims)}: {ims}"
+        )
+    im = ims[0]
+    if len(im_levels[im]) != 1:
+        raise ValueError(
+            f"Expected exactly one IM level for disaggregation, "
+            f"got {len(im_levels[im])}: {im_levels[im]}"
+        )
+
+    # Extract results from OQ database
+    with Extractor(calc_id) as ex:
+        mean_disagg = ex.get(
+            f"disagg?kind={disagg_kind}&spec=stats&site_id=0&imt={im}&poe_id=0"
+        )
+
     assert np.isclose(oq_params.investigation_time, 1)
 
     dims = mean_disagg.shape_descr[:-2]  # Exclude 'imt' and 'poe'
     coords = {
         cur_dim: (
-            mean_disagg[cur_dim].astype(str) if cur_dim == "trt" else mean_disagg[cur_dim]
+            mean_disagg[cur_dim].astype(str)
+            if cur_dim == "trt"
+            else mean_disagg[cur_dim]
         )
         for cur_dim in dims
     }
@@ -195,7 +210,7 @@ def get_disagg_stats(
     disagg = disagg.rename({"trt": "tect_type"})
 
     # Convert to rates
-    disagg = -np.log(1 - disagg) 
+    disagg = -np.log(1 - disagg)
 
     # Convert to contribution percentages
     disagg = disagg / disagg.sum()
@@ -213,5 +228,5 @@ def get_disagg_stats(
         disagg.attrs["eps_bin_edges"] = eps_bin_edges
 
     rp = int(np.round(utils.prob_to_rp(mean_disagg.poe[0])))
-    imf = utils.get_im_file_format(get_im_name(mean_disagg.imt[0]))
+    imf = utils.get_im_file_format(get_im_name(im))
     disagg.to_netcdf(output_dir / f"disagg_{imf}_RP{rp}.nc")
