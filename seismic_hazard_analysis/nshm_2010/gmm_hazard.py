@@ -170,7 +170,7 @@ def get_emp_gm_params(
 
 
 def get_oq_ds_rupture_df(
-    rupture_df: pd.DataFrame,
+    source_df: pd.DataFrame,
     site_nztm: np.ndarray[float],
     site_properties: dict[str, float],
 ):
@@ -181,8 +181,8 @@ def get_oq_ds_rupture_df(
 
     Parameters
     ----------
-    rupture_df: pd.DataFrame
-        The rupture dataframe for DS
+    source_df: pd.DataFrame
+        The source dataframe for DS
     site_nztm: np.ndarray[float]
         The site coordinates in NZTM (X, Y, Depth)
     site_properties: dict
@@ -206,29 +206,29 @@ def get_oq_ds_rupture_df(
         The rupture dataframe for DS
     """
     # Compute site distances
-    rupture_df["rjb"] = (
+    source_df["rjb"] = (
         np.sqrt(
-            (site_nztm[0] - rupture_df["nztm_x"]) ** 2
-            + (site_nztm[1] - rupture_df["nztm_y"]) ** 2
+            (site_nztm[0] - source_df["nztm_x"]) ** 2
+            + (site_nztm[1] - source_df["nztm_y"]) ** 2
         )
         / 1000
     )
-    rupture_df["rrup"] = (
+    source_df["rrup"] = (
         np.sqrt(
-            (site_nztm[0] - rupture_df["nztm_x"]) ** 2
-            + (site_nztm[1] - rupture_df["nztm_y"]) ** 2
-            + (rupture_df["depth"] * 1000) ** 2
+            (site_nztm[0] - source_df["nztm_x"]) ** 2
+            + (site_nztm[1] - source_df["nztm_y"]) ** 2
+            + (source_df["depth"] * 1000) ** 2
         )
         / 1000
     )
     # Use Rjb for rx and ry, in the past we have used zero for this.
     # Using Rjb gives the same result (when using Br13 and ZA06)
     # as using zero, and makes more sense.
-    rupture_df["rx"] = rupture_df["rjb"]
-    rupture_df["ry"] = rupture_df["rjb"]
+    source_df["rx"] = source_df["rjb"]
+    source_df["ry"] = source_df["rjb"]
 
     # rupture_df["hypo_depth"] = rupture_df["depth"]
-    rupture_df = rupture_df.rename(
+    source_df = source_df.rename(
         columns={
             "dtop": "ztor",
             "dbot": "zbot",
@@ -236,15 +236,15 @@ def get_oq_ds_rupture_df(
         }
     )
 
-    rupture_df["vs30"] = site_properties["vs30"]
-    rupture_df["z1pt0"] = site_properties["z1p0"]
-    rupture_df["vs30measured"] = site_properties["vs30measured"]
+    source_df["vs30"] = site_properties["vs30"]
+    source_df["z1pt0"] = site_properties["z1p0"]
+    source_df["vs30measured"] = site_properties["vs30measured"]
     if "z2p5" in site_properties.keys():
-        rupture_df["z2pt5"] = site_properties["z2p5"]
+        source_df["z2pt5"] = site_properties["z2p5"]
     if "backarc" in site_properties.keys():
-        rupture_df["backarc"] = site_properties["backarc"]
+        source_df["backarc"] = site_properties["backarc"]
 
-    return rupture_df
+    return source_df
 
 
 def compute_gmm_hazard(
