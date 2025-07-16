@@ -2,7 +2,6 @@ from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
 import oq_wrapper as oqw
 from qcore import nhm

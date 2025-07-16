@@ -224,7 +224,7 @@ def disagg_plot(
     uniform_mag_bin_width = None
     # Magnitude bin edges are given
     # Can be non-uniform
-    if (mag_bin_edges := disagg.attrs.get("mag_bin_edges", None)) is not None:
+    if (disagg.attrs.get("mag_bin_edges", None)) is not None:
         # mag_bin_width = np.diff(mag_bin_edges)
         raise NotImplementedError()
     # Constant magnitude bin width

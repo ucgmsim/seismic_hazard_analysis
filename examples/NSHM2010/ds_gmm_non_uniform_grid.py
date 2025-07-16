@@ -100,7 +100,7 @@ def _process_site(
             gmm_mapping,
             ims,
         )
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         print(f"Error processing site {site_id}: {e}")
         print(f"Full traceback:\n{traceback.format_exc()}")
         return None
@@ -159,7 +159,7 @@ def _process_batch(
     np.save(out_dir / f"ds_hazard_sites_{batch_ix}.npy", sites)
 
 
-def main():
+def main(): # noqa: D103
     # Load the ERF files
     ds_erf_df = pd.read_csv(ds_erf_ffp, index_col="rupture_name")
     ds_source_df = sha.nshm_2010.get_ds_source_df(background_ffp)

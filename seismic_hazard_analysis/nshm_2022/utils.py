@@ -1,6 +1,6 @@
+import enum
 import json
 from pathlib import Path
-import enum
 
 import geojson
 import numpy as np
