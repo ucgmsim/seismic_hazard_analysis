@@ -21,4 +21,4 @@ jobs:
       # Remove pyproject.toml so that deptry doesn't get confused
       - run: rm pyproject.toml
       # Run deptry to check that all dependencies are present.
-      - run: deptry . --ignore-unused pyyaml # Ignore pyyaml as it is used in the tests
+      - run: deptry . 
