@@ -181,8 +181,8 @@ def get_oq_ds_rupture_df(
 
     Parameters
     ----------
-    source: pd.DataFrame
-        The source dataframe for DS
+    rupture_df: pd.DataFrame
+        The rupture dataframe for DS
     site_nztm: np.ndarray[float]
         The site coordinates in NZTM (X, Y, Depth)
     site_properties: dict
@@ -391,8 +391,8 @@ def compute_gmm_flt_hazard(
         List of intensity measures.
     faults : dict[str, sources.Fault], optional
         Dictionary of fault objects.
-        If not provided, it will be created from flt_erf.
-    flt_erf : dict[str, nhm.NHMFault], optional
+        If not provided, it will be created from flt_definitions.
+    flt_definitions : dict[str, nhm.NHMFault], optional
         Dictionary containing fault ERF data.
         If not provided, faults must be provided.
     gmm_epistemic_branch : oqw.constants.EpistemicBranch, optional

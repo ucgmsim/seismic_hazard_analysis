@@ -655,7 +655,7 @@ def compute_segment_rjb_rrup(
             v2 = cur_segment_nztm_coords[2, :] - cur_segment_nztm_coords[0, :]
             n = np.cross(v2, v1)
             rrup_values[i] = (
-                np.dot(n, (site_nztm_coords - cur_segment_nztm_coords[0, :]))
+                np.abs(np.dot(n, (site_nztm_coords - cur_segment_nztm_coords[0, :])))
                 / np.linalg.norm(n)
             ) / 1e3
             rjb_values[i] = 0

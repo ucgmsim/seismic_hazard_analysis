@@ -41,8 +41,8 @@ PERIODS = [
     0.8,
     0.9,
     1.0,
-    1.25,
     1.2,
+    1.25,
     1.5,
     2.0,
     2.5,
@@ -65,30 +65,14 @@ vs30measured = True
 batch_size = 1000
 n_procs = 32
 
-background_ffp = Path(
-    "/Users/claudy/dev/work/data/gm_hazard/sources/18p6/archive/NZBCK211_OpenSHA.txt"
-)
-ds_erf_ffp = Path(
-    "/Users/claudy/dev/work/data/gm_hazard/sources/18p6/archive/NZ_DSmodel_2010.txt"
-)
-sites_ffp = Path(
-    "/Users/claudy/dev/work/data/gm_hazard/sites/23p1/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.ll"
-)
+background_ffp = Path("/path/to/NZBCK211_OpenSHA.txt")
+ds_erf_ffp = Path("/path/to/NZ_DSmodel_2010.txt")
+sites_ffp = Path("/path/to/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.ll")
 vs30_ffp = Path(
-    "/Users/claudy/dev/work/data/gm_hazard/sites/23p1/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.vs30"
+    "/path/to/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.vs30"
 )
-z_ffp = Path(
-    "/Users/claudy/dev/work/data/gm_hazard/sites/23p1/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.z"
-)
-out_dir = Path("/Users/claudy/dev/work/tmp/ds_hazard_test")
-
-# background_ffp = Path("/home/cbs51/dev/work/data/gm_hazard/sources/18p6/archive/NZBCK211_OpenSHA.txt")
-# ds_erf_ffp = Path("/home/cbs51/dev/work/data/gm_hazard/sources/18p6/archive/NZ_DSmodel_2010.txt")
-# sites_ffp = "/home/cbs51/dev/work/data/gm_hazard/sites/23p1/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.ll"
-# vs30_ffp = "/home/cbs51/dev/work/data/gm_hazard/sites/23p1/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.vs30"
-# z_ffp = "/home/cbs51/dev/work/data/gm_hazard/sites/23p1/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.z"
-# out_dir = Path("/home/cbs51/dev/work/tmp/ds_hazard_test")
-###
+z_ffp = Path("/path/to/non_uniform_whole_nz_with_real_stations-hh400_v20p3_land.z")
+out_dir = Path("/path/to/output/directory")
 
 
 def _process_site(
@@ -121,7 +105,7 @@ def _process_site(
         print(f"Full traceback:\n{traceback.format_exc()}")
         return None
     else:
-        return cur_ds_hazard
+        return site_id, cur_ds_hazard
 
 
 def _process_batch(
@@ -161,10 +145,13 @@ def _process_batch(
     # Combine the results
     comb_results = {}
     for cur_im in ims:
-        cur_result = pd.concat(
-            [cur_res[cur_im] for cur_res in results if cur_res is not None], axis=1
+        cur_result = pd.DataFrame.from_dict(
+            {
+                cur_site: cur_res[cur_im]
+                for cur_site, cur_res in results
+                if cur_res is not None
+            }
         )
-        cur_result.columns = sites
         comb_results[cur_im] = cur_result
 
     # Save the results
