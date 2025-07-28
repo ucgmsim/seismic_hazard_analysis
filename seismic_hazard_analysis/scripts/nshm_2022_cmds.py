@@ -1,10 +1,12 @@
 import multiprocessing as mp
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import typer
 import xarray as xr
+from tqdm import tqdm
 
 import seismic_hazard_analysis as sha
 
@@ -120,7 +122,9 @@ def extract_disagg(
     output_dir: Path = typer.Argument(
         ..., help="Directory to save the extracted disaggregation data"
     ),
-    disagg_kind : str = typer.Option("TRT_Mag_Dist_Eps", help="Kind of disaggregation to extract")
+    disagg_kind: str = typer.Option(
+        "TRT_Mag_Dist_Eps", help="Kind of disaggregation to extract"
+    ),
 ):
     """Extract diaggregation from OQ database"""
     sha.nshm_2022.get_disagg_stats(calc_id, output_dir, disagg_kind=disagg_kind)
@@ -171,6 +175,60 @@ def disagg_plot(
             plot_type,
             output_dir / f"{ffp.stem}_{plot_type}.png",
         )
+
+
+@app.command("disagg-mean-values")
+def disagg_mean_values(
+    disagg_results_ffps: list[Path] = typer.Argument(
+        ..., help="Path to the disaggregation result netCDF files"
+    ),
+    output_ffp: Path = typer.Argument(
+        ..., help="File path to save the mean disaggregation values"
+    ),
+):
+    """Compute mean disaggregation values for the given disaggregation results."""
+    results = []
+    for cur_result_ffp in tqdm(disagg_results_ffps, desc="Processing files"):
+        # Get the IM and RP from the filename
+        cur_result_ffp.stem.split("_")
+        match = re.search(r"disagg_(.+?)_RP(\d+)\.nc", cur_result_ffp.name)
+        if not match:
+            raise ValueError(
+                f"Filename {cur_result_ffp.name} does not match expected pattern."
+            )
+        im = sha.utils.reverse_im_file_format(match.group(1))
+        rp = int(match.group(2))
+
+        # Compute the mean values
+        disagg_da = xr.open_dataarray(cur_result_ffp)
+        mean_mag = (
+            (disagg_da.sum(dim=("dist", "eps", "tect_type")) * disagg_da.coords["mag"])
+            .sum()
+            .item()
+        )
+        mean_dist = (
+            (disagg_da.sum(dim=("mag", "eps", "tect_type")) * disagg_da.coords["dist"])
+            .sum()
+            .item()
+        )
+        mean_eps = (
+            (disagg_da.sum(dim=("mag", "dist", "tect_type")) * disagg_da.coords["eps"])
+            .sum()
+            .item()
+        )
+
+        results.append(
+            {
+                "im": im,
+                "rp": rp,
+                "mean_mag": mean_mag,
+                "mean_dist": mean_dist,
+                "mean_eps": mean_eps,
+            }
+        )
+
+    results_df = pd.DataFrame(results).sort_values(by=["im", "rp"])
+    results_df.to_csv(output_ffp, index=False)
 
 
 if __name__ == "__main__":

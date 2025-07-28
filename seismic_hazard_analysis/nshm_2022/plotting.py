@@ -53,7 +53,7 @@ def context_plot(
     """
     if not HAS_PYGMT:
         raise ImportError(
-            "pygmt_helper is not installed. " "Please install it to use this function."
+            "pygmt_helper is not installed. Please install it to use this function."
         )
 
     db = NSHMDB(nshm_source_db_ffp)
@@ -207,7 +207,7 @@ def disagg_plot(
     """
     if not HAS_PYGMT:
         raise ImportError(
-            "pygmt_helper is not installed. " "Please install it to use this function."
+            "pygmt_helper is not installed. Please install it to use this function."
         )
 
     z_col = utils.PLOT_TYPE_COL_MAPPING[plot_type]
