@@ -230,3 +230,7 @@ def get_disagg_stats(
     rp = int(np.round(utils.prob_to_rp(mean_disagg.poe[0])))
     imf = utils.get_im_file_format(get_im_name(im))
     disagg.to_netcdf(output_dir / f"disagg_{imf}_RP{rp}.nc")
+
+    # Also save as CSV
+    disagg_df = disagg.to_dataframe().reset_index().rename(columns={"disagg": "contribution"})
+    disagg_df.to_csv(output_dir / f"disagg_{imf}_RP{rp}.csv", index=False)
