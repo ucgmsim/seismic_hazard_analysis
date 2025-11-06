@@ -294,11 +294,11 @@ def disagg_plot(
     # Set the major and minor ticks for distance
     if uniform_dist_bin_width:
         if np.ceil((max_dist - min_dist) / uniform_dist_bin_width) > 10:
-            plot_kwargs["dist_major_tick"] = dist_bin_width[0] * 2
-            plot_kwargs["dist_minor_tick"] = dist_bin_width[0] 
+            plot_kwargs["dist_major_tick"] = uniform_dist_bin_width * 2
+            plot_kwargs["dist_minor_tick"] = uniform_dist_bin_width 
         else:
-            plot_kwargs["dist_major_tick"] = dist_bin_width[0]
-            plot_kwargs["dist_minor_tick"] = dist_bin_width[0] / 2
+            plot_kwargs["dist_major_tick"] = uniform_dist_bin_width
+            plot_kwargs["dist_minor_tick"] = uniform_dist_bin_width / 2
 
     if plot_type == utils.DisaggPlotType.TectonicType:
         category_specs = {
