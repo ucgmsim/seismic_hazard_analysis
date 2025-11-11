@@ -154,7 +154,6 @@ def context_plot(
         text="Site",
         justify="BC",
         fill="white",
-        # transparency=25,
         font="8p,Helvetica,black",
     )
 
@@ -225,7 +224,6 @@ def disagg_plot(
     # Magnitude bin edges are given
     # Can be non-uniform
     if (disagg.attrs.get("mag_bin_edges", None)) is not None:
-        # mag_bin_width = np.diff(mag_bin_edges)
         raise NotImplementedError()
     # Constant magnitude bin width
     else:

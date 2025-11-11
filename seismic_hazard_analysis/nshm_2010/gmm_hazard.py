@@ -183,7 +183,7 @@ def get_oq_ds_rupture_df(
     source_df: pd.DataFrame
         The source dataframe for DS
     site_nztm: np.ndarray[float]
-        The site coordinates in NZTM (X, Y, Depth)
+        The site coordinates in NZTM (X, Y)
     site_properties: dict
         Dictionary containing site properties:
         - vs30: float, required
@@ -204,6 +204,8 @@ def get_oq_ds_rupture_df(
     rupture_df: pd.DataFrame
         The rupture dataframe for DS
     """
+    source_df = source_df.copy()   
+
     # Compute site distances
     source_df["rjb"] = (
         np.sqrt(
@@ -226,7 +228,6 @@ def get_oq_ds_rupture_df(
     source_df["rx"] = source_df["rjb"]
     source_df["ry"] = source_df["rjb"]
 
-    # rupture_df["hypo_depth"] = rupture_df["depth"]
     source_df = source_df.rename(
         columns={
             "dtop": "ztor",
@@ -251,6 +252,8 @@ def compute_gmm_hazard(
     rec_prob: pd.Series,
     ims: Sequence[str],
     im_levels: dict[str, np.ndarray[float]] = None,
+    mean_col_suffix: str = "_mean",
+    std_col_suffix: str = "_std_Total",
 ):
     """
     Computes the hazard curves for the given
@@ -285,8 +288,8 @@ def compute_gmm_hazard(
         gm_prob_df = hazard.parametric_gm_excd_prob(
             cur_im_levels,
             gm_params_df,
-            mean_col=f"{cur_im}_mean",
-            std_col=f"{cur_im}_std_Total",
+            mean_col=f"{cur_im}{mean_col_suffix}",
+            std_col=f"{cur_im}{std_col_suffix}",
         )
         hazard_results[cur_im] = hazard.hazard_curve(gm_prob_df, rec_prob)
 
