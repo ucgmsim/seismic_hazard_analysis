@@ -164,8 +164,8 @@ def get_ds_source_df(background_ffp: Path):
 
     rupture_df = pd.DataFrame(data=data)
     rupture_df["fault_name"] = rupture_df["fault_name"].astype("category")
-    rupture_df["rupture_name"] = rupture_df["rupture_name"].astype("category")
     rupture_df["tectonic_type"] = rupture_df["tectonic_type"].astype("category")
+    rupture_df["rupture_name"] = rupture_df["rupture_name"]
     rupture_df = rupture_df.set_index("rupture_name")
 
     rupture_df[["nztm_y", "nztm_x", "depth"]] = coords.wgs_depth_to_nztm(

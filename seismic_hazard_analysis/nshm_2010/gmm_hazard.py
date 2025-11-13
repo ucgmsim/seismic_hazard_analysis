@@ -151,7 +151,11 @@ def get_emp_gm_params(
                 cur_rupture_df,
                 "pSA",
                 periods=pSA_periods,
-                epistemic_branch=gmm_epistemic_branch if gmm_epistemic_branch else oqw.constants.EpistemicBranch.CENTRAL,
+                epistemic_branch=(
+                    gmm_epistemic_branch
+                    if gmm_epistemic_branch
+                    else oqw.constants.EpistemicBranch.CENTRAL
+                ),
             )
         else:
             cur_result = oqw.run_gmm_logic_tree(
@@ -204,7 +208,7 @@ def get_oq_ds_rupture_df(
     rupture_df: pd.DataFrame
         The rupture dataframe for DS
     """
-    source_df = source_df.copy()   
+    source_df = source_df.copy()
 
     # Compute site distances
     source_df["rjb"] = (
@@ -304,6 +308,7 @@ def compute_gmm_ds_hazard(
     gmm_mapping: dict[oqw.constants.TectType, oqw.constants.GMM],
     ims: Sequence[str],
     gmm_epistemic_branch: oqw.constants.EpistemicBranch | None = None,
+    max_rrup: float | None = None,
 ):
     """
     Compute the seismic hazard for a given site using
@@ -341,6 +346,10 @@ def compute_gmm_ds_hazard(
         The epistemic branch to use for the GMMs.
         If None, the central branch is used.
         Not supported for GMMLogicTree!
+    max_rrup : float, optional
+        Maximum rupture distance, any ruptures beyond this distance
+        will be ignored for hazard computation.
+        Set None to include all ruptures.
 
     Returns
     -------
@@ -348,7 +357,14 @@ def compute_gmm_ds_hazard(
         DataFrame containing the computed seismic hazard for the given site.
     """
     oq_rupture_df = get_oq_ds_rupture_df(source_df, site_nztm, site_properties)
-    ds_gm_params_df = get_emp_gm_params(oq_rupture_df, gmm_mapping, ims, gmm_epistemic_branch=gmm_epistemic_branch).sort_index()
+    if max_rrup is not None:
+        oq_rupture_df = oq_rupture_df.loc[
+            oq_rupture_df["rrup"] <= max_rrup
+        ]
+
+    ds_gm_params_df = get_emp_gm_params(
+        oq_rupture_df, gmm_mapping, ims, gmm_epistemic_branch=gmm_epistemic_branch
+    ).sort_index()
     ds_hazard = compute_gmm_hazard(ds_gm_params_df, ds_erf_df.annual_rec_prob, ims)
 
     return ds_hazard
