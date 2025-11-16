@@ -3,8 +3,11 @@ import json
 from pathlib import Path
 
 import geojson
+import geopandas as gpd
 import numpy as np
-from turfpy.measurement import points_within_polygon
+import shapely
+
+from qcore import coordinates
 
 BACKARC_JSON_FFP = Path(__file__).parent.parent.parent / "data/NSHM2022" / "backarc.json" 
 
@@ -29,26 +32,17 @@ def get_backarc_mask(locs: np.ndarray):
     locs: array of floats
         [lon, lat]
     """
+    nztm_values = coordinates.wgs_depth_to_nztm(locs[:, ::-1])[:, [1, 0]]
+    site_points_df = gpd.GeoDataFrame(
+            geometry=gpd.points_from_xy(nztm_values[:, 0], nztm_values[:, 1]),
+            crs="EPSG:2193",
+        )
+    
+    backarc_region = gpd.read_file(BACKARC_JSON_FFP).to_crs("EPSG:2193")
+    backarc_region["backarc"] = True
 
-    # Determine if backarc needs to be enabled for each loc
-    points = geojson.FeatureCollection(
-        [
-            geojson.Feature(geometry=geojson.Point(tuple(cur_loc[::-1]), id=ix))
-            for ix, cur_loc in enumerate(locs)
-        ]
-    )
-    with BACKARC_JSON_FFP.open("r") as f:
-        poly_coords = np.flip(json.load(f)["geometry"]["coordinates"][0], axis=1)
-
-    polygon = geojson.Polygon([poly_coords.tolist()])
-    backarc_ind = (
-        [
-            cur_point["geometry"]["id"]
-            for cur_point in points_within_polygon(points, polygon)["features"]
-        ],
-    )
-    backarc_mask = np.zeros(shape=locs.shape[0], dtype=bool)
-    backarc_mask[backarc_ind] = True
-
+    joined = gpd.sjoin(site_points_df, backarc_region, how="left", predicate="within")
+    backarc_mask = joined["backarc"].fillna(False).to_numpy(dtype=bool)
+    
     return backarc_mask
 
