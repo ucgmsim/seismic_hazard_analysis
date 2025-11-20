@@ -1,9 +1,10 @@
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 import seismic_hazard_analysis as sha
+
 
 def test_backarc_mask():
     bench_site_df = pd.read_csv(

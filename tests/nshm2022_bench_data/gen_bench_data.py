@@ -1,9 +1,9 @@
 from pathlib import Path
 
 import pandas as pd
-import numpy as np
 
 import seismic_hazard_analysis as sha
+
 
 def main():
     site_df = pd.read_csv(Path(__file__).parent / "bench_sites.csv")

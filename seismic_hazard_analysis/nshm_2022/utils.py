@@ -1,11 +1,8 @@
 import enum
-import json
 from pathlib import Path
 
-import geojson
 import geopandas as gpd
 import numpy as np
-import shapely
 
 from qcore import coordinates
 
