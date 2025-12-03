@@ -2,7 +2,7 @@
 name: deploy-wiki
 on:
   push:
-    branches: "nshm2022"
+    branches: "main"
     paths: wiki/**
   workflow_dispatch:
 jobs:
