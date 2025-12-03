@@ -25,5 +25,5 @@ jobs:
       - name: Run tests
         run: |
           # Prevent automatic loading of plugins to avoid dependency issues (zarr)
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \ 
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
           pytest tests 
