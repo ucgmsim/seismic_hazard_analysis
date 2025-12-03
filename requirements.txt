@@ -9,9 +9,7 @@ numba
 pyyaml
 openquake.engine
 seaborn
-geojson
 geopandas
-shapely
 typer
 nshmdb @ git+https://github.com/ucgmsim/NSHM2022DB.git
 pygmt_helper @ git+https://github.com/ucgmsim/pygmt_helper.git
