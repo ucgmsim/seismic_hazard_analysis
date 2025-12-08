@@ -274,7 +274,8 @@ def exceedance_to_im(
 ):
     """
     Converts the given exceedance rate to an IM value, based on the
-    provided im and hazard values
+    provided im and hazard values.
+    
     Parameters
     ----------
     exceedances: array of float
@@ -285,6 +286,7 @@ def exceedance_to_im(
     hazard_values: numpy array
         The hazard values corresponding to the IM values
         Has to be the same shape as im_values
+
     Returns
     -------
     float
