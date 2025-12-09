@@ -5,6 +5,7 @@ Modules:
 - hazard: Functions for computing seismic hazard.
 - disagg: Functions for computing disaggregation.
 - gms: Functions and classes for ground motion selection (GMS).
+- uhs: Functions for computing uniform hazard spectra (UHS).
 - models: Implementation of scientific models.
 - utils: Utility functions.
 - im_correlations: Functions for computing IM correlations.
@@ -20,8 +21,10 @@ from . import (
     im_correlations,
     models,
     nshm_2010,
+    nshm_2022,
     nzs1170p5,
     site_source,
+    uhs,
     utils,
 )
 
@@ -33,7 +36,9 @@ __all__ = [
     "im_correlations",
     "models",
     "nshm_2010",
+    "nshm_2022",
     "nzs1170p5",
     "site_source",
     "utils",
+    "uhs"
 ]

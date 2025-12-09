@@ -103,7 +103,7 @@ def hazard_single(gm_prob: pd.Series, rec_prob: pd.Series):
         The exceedance probability
     """
     ruptures = gm_prob.index.values
-    return np.sum(gm_prob[ruptures] * rec_prob[ruptures])
+    return np.sum(gm_prob[ruptures] * rec_prob[ruptures], axis=0)
 
 
 def hazard_curve(gm_prob_df: pd.DataFrame, rec_prob: pd.Series):

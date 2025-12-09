@@ -1,22 +1,20 @@
 from collections.abc import Sequence
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
-from empirical.util.classdef import GMM, TectType
-from empirical.util.openquake_wrapper_vectorized import oq_run
+import oq_wrapper as oqw
+from qcore import nhm
 from source_modelling import sources
 
-from .. import hazard, site_source, utils
-from . import utils as nshm2010_utils
+from .. import hazard, utils
+from . import utils as nshm_utils
 
 TECTONIC_TYPE_MAPPING = {
-    "ACTIVE_SHALLOW": TectType.ACTIVE_SHALLOW,
-    "VOLCANIC": TectType.ACTIVE_SHALLOW,
-    "SUBDUCTION_INTERFACE": TectType.SUBDUCTION_INTERFACE,
-    "SUBDUCTION_SLAB": TectType.SUBDUCTION_SLAB,
+    "ACTIVE_SHALLOW": oqw.constants.TectType.ACTIVE_SHALLOW,
+    "VOLCANIC": oqw.constants.TectType.ACTIVE_SHALLOW,
+    "SUBDUCTION_INTERFACE": oqw.constants.TectType.SUBDUCTION_INTERFACE,
+    "SUBDUCTION_SLAB": oqw.constants.TectType.SUBDUCTION_SLAB,
 }
 
 
@@ -24,8 +22,7 @@ def get_flt_rupture_df(
     faults: dict[str, sources.Fault],
     flt_erf_df: pd.DataFrame,
     site_nztm: np.ndarray[float],
-    site_vs30: float,
-    site_z1p0: float,
+    site_properties: dict[str, float],
 ):
     """
     Creates the rupture dataframe for the given
@@ -40,78 +37,55 @@ def get_flt_rupture_df(
         The fault ERF dataframe
     site_nztm: np.ndarray[float]
         The site coordinates in NZTM (X, Y, Depth)
-    site_vs30: float
-        The Vs30 value at the site
-    site_z1p0: float
-        The Z1.0 value at the site in kilometres
+    site_properties: dict
+        Dictionary containing site properties:
+        - vs30: float, required
+            The average shear-wave velocity in the upper 30 meters of the site.
+        - vs30measured: bool, required
+            Whether the Vs30 value is measured or not.
+        - z1p0: float, required
+            Depth to the 1.0 km/s shear-wave velocity horizon in km.
+        - z2p5: float
+            Depth to the 2.5 km/s shear-wave velocity horizon in km.
+            Only required for some GMMs
+        - backarc: bool
+            Whether the site is in the backarc region.
+            Only required for some GMMs
 
     Returns
     -------
     rupture_df: pd.DataFrame
         The rupture dataframe for the given faults
     """
-    fault_id_mapping = {cur_name: i for i, cur_name in enumerate(faults.keys())}
-
-    # Fault Distance calculation
-    plane_nztm_coords = []
-    scenario_ids = []
-    scenario_section_ids = []
-    segment_section_ids = []
-    for cur_name, cur_fault in tqdm(faults.items()):
-        plane_nztm_coords.append(
-            np.stack(
-                [cur_plane.bounds[:, [1, 0, 2]] for cur_plane in cur_fault.planes],
-                axis=2,
-            )
-        )
-        cur_id = fault_id_mapping[cur_name]
-        scenario_ids.append(cur_id)
-        # Each scenario only consists of a single fault/section
-        scenario_section_ids.append(np.asarray([cur_id]))
-        segment_section_ids.append(np.ones(len(cur_fault.planes), dtype=int) * cur_id)
-
-    plane_nztm_coords = np.concatenate(plane_nztm_coords, axis=2)
-    scenario_ids = np.asarray(scenario_ids)
-    segment_section_ids = np.concatenate(segment_section_ids)
-
-    assert plane_nztm_coords.shape[2] == segment_section_ids.size
-
-    # Change the order of the corners
-    plane_nztm_coords = plane_nztm_coords[[0, 3, 1, 2], :, :]
-
-    # Compute segment strike
-    segment_strike, segment_strike_vec = site_source.compute_segment_strike_nztm(
-        plane_nztm_coords
-    )
-
-    # Compute rupture scenario distances
-    rupture_df = site_source.get_scenario_distances(
-        scenario_ids,
-        scenario_section_ids,
-        plane_nztm_coords,
-        segment_section_ids,
-        site_nztm,
-    )
+    # Compute source to site distances
+    rupture_df = nshm_utils.run_site_to_source_dist(faults, site_nztm)
 
     # Add fault details to the rupture_df
     rupture_df.index = list(faults.keys())
-    rupture_df[["mag", "rake", "ztor", "tectonic_type", "dip", "dbottom"]] = (
+    rupture_df[["mag", "rake", "ztor", "tectonic_type", "dip", "zbot"]] = (
         flt_erf_df.loc[
             rupture_df.index, ["mw", "rake", "dtop", "tectonic_type", "dip", "dbottom"]
         ]
     )
-    rupture_df["vs30"] = site_vs30
-    rupture_df["z1pt0"] = site_z1p0
-    rupture_df["vs30measured"] = True
-
     # Use hypocentre depth at 1/2
-    rupture_df["hypo_depth"] = (rupture_df["dbottom"] + rupture_df["ztor"]) / 2
+    rupture_df["hypo_depth"] = (rupture_df["zbot"] + rupture_df["ztor"]) / 2
+
+    rupture_df["vs30"] = site_properties["vs30"]
+    rupture_df["z1pt0"] = site_properties["z1p0"]
+    rupture_df["vs30measured"] = site_properties["vs30measured"]
+    if "z2p5" in site_properties.keys():
+        rupture_df["z2pt5"] = site_properties["z2p5"]
+    if "backarc" in site_properties.keys():
+        rupture_df["backarc"] = site_properties["backarc"]
 
     return rupture_df
 
 
 def get_emp_gm_params(
-    rupture_df: pd.DataFrame, gmm_mapping: dict[TectType, GMM], pSA_periods: list[float]
+    rupture_df: pd.DataFrame,
+    gmm_mapping: dict[oqw.constants.TectType, oqw.constants.GMM],
+    ims: list[str],
+    gmm_epistemic_branch: oqw.constants.EpistemicBranch | None = None,
 ):
     """
     Computes the GM parameters for the given
@@ -127,14 +101,41 @@ def get_emp_gm_params(
         OpenQuake GMM wrapper.
     gmm_mapping: dict
         Specifies the GMM to use for each tectonic type
-    pSA_periods: list[float]
-        The periods for which to compute the GM parameters
+    ims: list
+        The IMs to compute the GM parameters for
+    gmm_epistemic_branch: oqw.constants.EpistemicBranch, optional
+        The epistemic branch to use for the GMMs.
+        If None, the central branch is used.
+        Not supported for GMMLogicTree!
+
+    Raises
+    ------
+    ValueError
+        If gmm_epistemic_branch is specified and a GMMLogicTree is used
 
     Returns
     -------
     gm_params_df: pd.DataFrame
         The GM parameters for the given ruptures
     """
+    if gmm_epistemic_branch is not None and any(
+        isinstance(cur_gmm, oqw.constants.GMMLogicTree)
+        for cur_gmm in gmm_mapping.values()
+    ):
+        raise ValueError(
+            "gmm_epistemic_branch is not supported when using GMM logic trees!"
+        )
+
+    pSA_periods = [
+        float(im.rsplit("_", maxsplit=1)[1]) for im in ims if im.startswith("pSA")
+    ]
+
+    non_pSA_ims = [cur_im for cur_im in ims if not cur_im.startswith("pSA")]
+    if len(non_pSA_ims) > 0:
+        raise ValueError(
+            f"The IMs {non_pSA_ims} are not supported. Only pSA is currently supported!"
+        )
+
     gm_params_df = []
     for cur_tect_type_str in rupture_df["tectonic_type"].unique():
         cur_tect_type = TECTONIC_TYPE_MAPPING[cur_tect_type_str]
@@ -143,13 +144,27 @@ def get_emp_gm_params(
         cur_rupture_df = rupture_df.loc[
             rupture_df["tectonic_type"] == cur_tect_type_str
         ]
-        cur_result = oq_run(
-            cur_gmm,
-            cur_tect_type,
-            cur_rupture_df,
-            "SA",
-            periods=pSA_periods,
-        )
+        if isinstance(cur_gmm, oqw.constants.GMM):
+            cur_result = oqw.run_gmm(
+                cur_gmm,
+                cur_tect_type,
+                cur_rupture_df,
+                "pSA",
+                periods=pSA_periods,
+                epistemic_branch=(
+                    gmm_epistemic_branch
+                    if gmm_epistemic_branch
+                    else oqw.constants.EpistemicBranch.CENTRAL
+                ),
+            )
+        else:
+            cur_result = oqw.run_gmm_logic_tree(
+                cur_gmm,
+                cur_tect_type,
+                cur_rupture_df,
+                "pSA",
+                periods=pSA_periods,
+            )
         cur_result.index = cur_rupture_df.index
         gm_params_df.append(cur_result)
 
@@ -158,10 +173,9 @@ def get_emp_gm_params(
 
 
 def get_oq_ds_rupture_df(
-    background_ffp: Path,
+    source_df: pd.DataFrame,
     site_nztm: np.ndarray[float],
-    site_vs30: float,
-    site_z1p0: float,
+    site_properties: dict[str, float],
 ):
     """
     Creates the rupture dataframe for
@@ -170,56 +184,71 @@ def get_oq_ds_rupture_df(
 
     Parameters
     ----------
-    background_ffp: Path
-        The file path to the background seismicity file
+    source_df: pd.DataFrame
+        The source dataframe for DS
     site_nztm: np.ndarray[float]
-        The site coordinates in NZTM (X, Y, Depth)
-    site_vs30: float
-        The Vs30 value at the site
-    site_z1p0: float
-        The Z1.0 value at the site in kilometres
+        The site coordinates in NZTM (X, Y)
+    site_properties: dict
+        Dictionary containing site properties:
+        - vs30: float, required
+            The average shear-wave velocity in the upper 30 meters of the site.
+        - vs30measured: bool, required
+            Whether the Vs30 value is measured or not.
+        - z1p0: float, required
+            Depth to the 1.0 km/s shear-wave velocity horizon in km.
+        - z2p5: float
+            Depth to the 2.5 km/s shear-wave velocity horizon in km.
+            Only required for some GMMs
+        - backarc: bool
+            Whether the site is in the backarc region.
+            Only required for some GMMs
 
     Returns
     -------
     rupture_df: pd.DataFrame
-        The rupture dataframe for the distributed seismicity
+        The rupture dataframe for DS
     """
-    rupture_df = nshm2010_utils.get_ds_rupture_df(background_ffp)
+    source_df = source_df.copy()
 
     # Compute site distances
-    rupture_df["rjb"] = (
+    source_df["rjb"] = (
         np.sqrt(
-            (site_nztm[0] - rupture_df["nztm_x"]) ** 2
-            + (site_nztm[1] - rupture_df["nztm_y"]) ** 2
+            (site_nztm[0] - source_df["nztm_x"]) ** 2
+            + (site_nztm[1] - source_df["nztm_y"]) ** 2
         )
         / 1000
     )
-    rupture_df["rrup"] = (
+    source_df["rrup"] = (
         np.sqrt(
-            (site_nztm[0] - rupture_df["nztm_x"]) ** 2
-            + (site_nztm[1] - rupture_df["nztm_y"]) ** 2
-            + (rupture_df["depth"] * 1000) ** 2
+            (site_nztm[0] - source_df["nztm_x"]) ** 2
+            + (site_nztm[1] - source_df["nztm_y"]) ** 2
+            + (source_df["depth"] * 1000) ** 2
         )
         / 1000
     )
     # Use Rjb for rx and ry, in the past we have used zero for this.
-    # Using Rjb gives the same result (when using Br13 and ZA06) 
+    # Using Rjb gives the same result (when using Br13 and ZA06)
     # as using zero, and makes more sense.
-    rupture_df["rx"] = rupture_df["rjb"]
-    rupture_df["ry"] = rupture_df["rjb"]
+    source_df["rx"] = source_df["rjb"]
+    source_df["ry"] = source_df["rjb"]
 
-    rupture_df["hypo_depth"] = rupture_df["depth"]
-    rupture_df = rupture_df.rename(
+    source_df = source_df.rename(
         columns={
             "dtop": "ztor",
+            "dbot": "zbot",
+            "depth": "hypo_depth",
         }
     )
 
-    rupture_df["vs30"] = site_vs30
-    rupture_df["z1pt0"] = site_z1p0
-    rupture_df["vs30measured"] = True
+    source_df["vs30"] = site_properties["vs30"]
+    source_df["z1pt0"] = site_properties["z1p0"]
+    source_df["vs30measured"] = site_properties["vs30measured"]
+    if "z2p5" in site_properties.keys():
+        source_df["z2pt5"] = site_properties["z2p5"]
+    if "backarc" in site_properties.keys():
+        source_df["backarc"] = site_properties["backarc"]
 
-    return rupture_df
+    return source_df
 
 
 def compute_gmm_hazard(
@@ -227,6 +256,8 @@ def compute_gmm_hazard(
     rec_prob: pd.Series,
     ims: Sequence[str],
     im_levels: dict[str, np.ndarray[float]] = None,
+    mean_col_suffix: str = "_mean",
+    std_col_suffix: str = "_std_Total",
 ):
     """
     Computes the hazard curves for the given
@@ -261,9 +292,160 @@ def compute_gmm_hazard(
         gm_prob_df = hazard.parametric_gm_excd_prob(
             cur_im_levels,
             gm_params_df,
-            mean_col=f"{cur_im}_mean",
-            std_col=f"{cur_im}_std_Total",
+            mean_col=f"{cur_im}{mean_col_suffix}",
+            std_col=f"{cur_im}{std_col_suffix}",
         )
         hazard_results[cur_im] = hazard.hazard_curve(gm_prob_df, rec_prob)
 
     return hazard_results
+
+
+def compute_gmm_ds_hazard(
+    source_df: pd.DataFrame,
+    ds_erf_df: pd.DataFrame,
+    site_nztm: np.ndarray[float],
+    site_properties: dict[str, float],
+    gmm_mapping: dict[oqw.constants.TectType, oqw.constants.GMM],
+    ims: Sequence[str],
+    gmm_epistemic_branch: oqw.constants.EpistemicBranch | None = None,
+    max_rrup: float | None = None,
+):
+    """
+    Compute the seismic hazard for a given site using
+    the provided rupture and empirical ground motion models (GMM).
+
+    Parameters
+    ----------
+    source_df : pd.DataFrame
+        DataFrame containing DS source information.
+    ds_erf_df : pd.DataFrame
+        DataFrame containing annual recurrence probabilities.
+    site_nztm : np.ndarray[float]
+        Array containing the site coordinates in NZTM projection.
+        [X, Y, Depth]
+    site_properties: dict
+        Dictionary containing site properties:
+        - vs30: float, required
+            The average shear-wave velocity in the upper 30 meters of the site.
+        - vs30measured: bool, required
+            Whether the Vs30 value is measured or not.
+        - z1p0: float, required
+            Depth to the 1.0 km/s shear-wave velocity horizon in km.
+        - z2p5: float
+            Depth to the 2.5 km/s shear-wave velocity horizon in km.
+            Only required for some GMMs
+        - backarc: bool
+            Whether the site is in the backarc region.
+            Only required for some GMMs
+    gmm_mapping : dict[TectType, GMM]
+        Dictionary mapping tectonic types to their
+        corresponding ground motion models (GMM).
+    ims : Sequence[str]
+        Sequence of intensity measures to be considered.
+    gmm_epistemic_branch : oqw.constants.EpistemicBranch, optional
+        The epistemic branch to use for the GMMs.
+        If None, the central branch is used.
+        Not supported for GMMLogicTree!
+    max_rrup : float, optional
+        Maximum rupture distance, any ruptures beyond this distance
+        will be ignored for hazard computation.
+        Set None to include all ruptures.
+
+    Returns
+    -------
+    ds_hazard : pd.DataFrame
+        DataFrame containing the computed seismic hazard for the given site.
+    """
+    oq_rupture_df = get_oq_ds_rupture_df(source_df, site_nztm, site_properties)
+    if max_rrup is not None:
+        oq_rupture_df = oq_rupture_df.loc[
+            oq_rupture_df["rrup"] <= max_rrup
+        ]
+
+    ds_gm_params_df = get_emp_gm_params(
+        oq_rupture_df, gmm_mapping, ims, gmm_epistemic_branch=gmm_epistemic_branch
+    ).sort_index()
+    ds_hazard = compute_gmm_hazard(ds_gm_params_df, ds_erf_df.annual_rec_prob, ims)
+
+    return ds_hazard
+
+
+def compute_gmm_flt_hazard(
+    site_nztm: np.ndarray[float],
+    site_properties: dict[str, float],
+    flt_erf_df: pd.DataFrame,
+    gmm_mapping: dict[oqw.constants.TectType, oqw.constants.GMM],
+    ims: Sequence[str],
+    faults: dict[str, sources.Fault] | None = None,
+    flt_definitions: dict[str, nhm.NHMFault] | None = None,
+    gmm_epistemic_branch: oqw.constants.EpistemicBranch | None = None,
+):
+    """
+    Compute the fault hazard for a given site.
+
+    Parameters:
+    -----------
+    site_nztm : np.ndarray[float]
+        The NZTM coordinates of the site.
+    site_properties: dict
+        Dictionary containing site properties:
+        - vs30: float, required
+            The average shear-wave velocity in the upper 30 meters of the site.
+        - vs30measured: bool, required
+            Whether the Vs30 value is measured or not.
+        - z1p0: float, required
+            Depth to the 1.0 km/s shear-wave velocity horizon in km.
+        - z2p5: float
+            Depth to the 2.5 km/s shear-wave velocity horizon in km.
+            Only required for some GMMs
+        - backarc: bool
+            Whether the site is in the backarc region.
+            Only required for some GMMs
+    flt_erf_df : pd.DataFrame
+        DataFrame containing fault ERF data.
+    gmm_mapping : dict[TectType, GMM]
+        Dictionary mapping tectonic types to GMM.
+    ims : Sequence[str]
+        List of intensity measures.
+    faults : dict[str, sources.Fault], optional
+        Dictionary of fault objects.
+        If not provided, it will be created from flt_definitions.
+    flt_definitions : dict[str, nhm.NHMFault], optional
+        Dictionary containing fault ERF data.
+        If not provided, faults must be provided.
+    gmm_epistemic_branch : oqw.constants.EpistemicBranch, optional
+        The epistemic branch to use for the GMMs.
+        If None, the central branch is used.
+        Not supported for GMMLogicTree!
+
+    Returns:
+    --------
+    flt_hazard : pd.DataFrame
+        DataFrame containing the computed fault hazard.
+
+    Raises:
+    -------
+    ValueError
+        If neither faults nor flt_erf are provided.
+    """
+    if faults is None and flt_definitions is None:
+        raise ValueError("Faults or fault ERF must be provided!")
+
+    # Create the fault objects
+    if faults is None:
+        faults = {
+            cur_name: nshm_utils.get_fault_objects(cur_fault)
+            for cur_name, cur_fault in flt_definitions.items()
+        }
+
+    # Get GM parameters
+    flt_rupture_df = get_flt_rupture_df(faults, flt_erf_df, site_nztm, site_properties)
+
+    # Compute hazard
+    flt_gm_params_df = get_emp_gm_params(
+        flt_rupture_df, gmm_mapping, ims, gmm_epistemic_branch=gmm_epistemic_branch
+    )
+    flt_hazard = compute_gmm_hazard(
+        flt_gm_params_df, 1 / flt_erf_df["recur_int_median"], ims
+    )
+    return flt_hazard
