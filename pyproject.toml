@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "seismic-hazard-analysis"
 authors = [
-    {name = "QuakeCoRE" },
+    {name = "ucgmsim" },
 ]
 description = "Code for performing seismic hazard analysis."
 readme = "README.md"
