@@ -1,5 +1,5 @@
 name: Publish to PyPI
-run-name: Publish Python Package to PyPI for release ${{ github.event.release.tag_name }}
+run-name: Publish Python Package to PyPI for release ${{ github.event.release.tag_name || inputs.tag_name || github.ref_name }}
 
 on:
   release:
@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag_name || github.ref }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5

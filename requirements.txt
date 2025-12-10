@@ -11,8 +11,8 @@ openquake.engine
 seaborn
 geopandas
 typer
-nshmdb @ git+https://github.com/ucgmsim/NSHM2022DB.git
-pygmt_helper @ git+https://github.com/ucgmsim/pygmt_helper.git
-source_modelling @ git+https://github.com/ucgmsim/source_modelling.git
-qcore @ git+https://github.com/ucgmsim/qcore.git
-oq_wrapper @ git+https://github.com/ucgmsim/Empirical_Engine.git#subdirectory=oq_wrapper
+nshmdb
+pygmt-helper
+source-modelling
+qcore-utils
+oq-wrapper

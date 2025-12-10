@@ -9,7 +9,7 @@ authors = [
 ]
 description = "Code for performing seismic hazard analysis."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11,<3.14"
 dynamic = ["version", "dependencies"]
 
 [tool.setuptools_scm]
