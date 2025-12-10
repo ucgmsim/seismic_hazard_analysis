@@ -5,12 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "seismic-hazard-analysis"
 authors = [
-    {name = "QuakeCoRE" },
+    {name = "ucgmsim" },
 ]
 description = "Code for performing seismic hazard analysis."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11,<3.14"
 dynamic = ["version", "dependencies"]
+
+[tool.setuptools_scm]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
