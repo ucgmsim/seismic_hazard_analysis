@@ -1,9 +1,9 @@
 """Script for creating Rx, Ry plots for a set of manually specified segments"""
 import matplotlib.pyplot as plt
 import numpy as np
-
-import seismic_hazard_analysis as sha   
 import utils
+
+import seismic_hazard_analysis as sha
 
 # Create the rupture coordinates
 

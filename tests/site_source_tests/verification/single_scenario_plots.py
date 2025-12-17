@@ -1,8 +1,6 @@
 """Script for creating Rx, Ry plots for a single manually specified scenario"""
-import numpy as np
-
 import matplotlib.pyplot as plt
-
+import numpy as np
 import utils
 
 # Create the rupture coordinates
