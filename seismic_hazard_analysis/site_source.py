@@ -1,8 +1,103 @@
-"""Module for computing site-source distances"""
+"""
+Module for computing site-source distances.
+
+Note that this designed for computing of distances for a single
+site and many sources. 
+Also it uses somewhat custom name, based on understanding at the time,
+think of:
+- "scenario" as rupture scenario,
+- "section" as fault,
+- "segment" as plane
+"""
 
 import numba as nb
 import numpy as np
 import pandas as pd
+
+from nshmdb.nshmdb import NSHMDB
+from qcore import coordinates
+
+
+def site_to_nztm(site_coords: np.ndarray):
+    """
+    Converts site coordinates from lon, lat, depth to NZTM
+
+    Parameters
+    ----------
+    site_coords: array of floats
+        Coordinates of points of interest
+        Shape: [3] (lon, lat, depth) or
+        Shape: [n_points, 3] (lon, lat, depth)
+
+    Returns
+    -------
+    array of floats
+        NZTM coordinates of points of interest
+        Shape: [n_points, 3] (x, y, z)
+    """
+    if len(site_coords.shape) == 1:
+        site_coords = site_coords[np.newaxis, :]
+
+    return coordinates.wgs_depth_to_nztm(site_coords[:, [1, 0, 2]])[
+        :, [1, 0, 2]
+    ]
+    
+
+def get_rupture_dist(db: NSHMDB, rupture_id: int, site_coords: np.ndarray):
+    """
+    Get rupture distances for the given rupture and sites.
+
+    Arguments
+    ---------
+    db : NSHMDB
+        The NSHM database object.
+    rupture_id : int
+        The rupture ID (from the NSHM database).
+    site_coords : np.ndarray
+        The site coordinates in (lon, lat, depth) format.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the rupture distances for each site.
+    """
+    if len(site_coords.shape) == 1:
+        site_coords = site_coords[np.newaxis, :]
+
+    site_nztm_coords = coordinates.wgs_depth_to_nztm(site_coords[:, [1, 0, 2]])[
+        :, [1, 0, 2]
+    ]
+
+    rupture_fault_info = db.get_rupture_fault_info(rupture_id)
+    rupture_fault_ids = np.array(
+        [info.fault_id for info in rupture_fault_info.values()]
+    )
+
+    plane_fault_ids = []
+    plane_nztm_coords = []
+    for fault in rupture_fault_info.values():
+        planes = db.get_fault_planes(fault.fault_id)
+
+        for plane in planes:
+            # Reorder the points, and reorder columns to be (x, y, z)
+            plane_nztm_coords.append(plane.bounds[[0, 3, 1, 2]][:, [1, 0, 2]])
+            plane_fault_ids.append(fault.fault_id)
+
+    plane_fault_ids = np.array(plane_fault_ids)
+    plane_nztm_coords = np.stack(plane_nztm_coords, axis=-1)
+
+    dist_dfs = []
+    for i in range(site_nztm_coords.shape[0]):
+        cur_dist_df = get_scenario_distances(
+            np.array([rupture_id]),
+            [rupture_fault_ids],
+            plane_nztm_coords,
+            plane_fault_ids,
+            site_nztm_coords[i],
+        )
+        dist_dfs.append(cur_dist_df)
+
+    return pd.concat(dist_dfs, keys=np.arange(len(dist_dfs)), ignore_index=True)
 
 
 def get_scenario_distances(
