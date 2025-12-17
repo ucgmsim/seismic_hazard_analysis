@@ -67,7 +67,7 @@ p_x, p_y = np.meshgrid(np.linspace(x_min, x_max, 99), np.linspace(y_min, y_max, 
 
 
 # Result arrays
-scenario_Rx, scenario_Ry, scenario_Rrup, scenario_Rjb = utils.compute_mesh_distances(
+scenario_rx, scenario_ry, scenario_rrup, scenario_rjb = utils.compute_mesh_distances(
     segment_nztm_coords, p_x, p_y, np.asarray([0, 1]), np.asarray([0, 1])
 )
 
@@ -77,7 +77,7 @@ utils.create_distance_plot(
     segment_nztm_coords,
     p_x,
     p_y,
-    scenario_Rx,
+    scenario_rx,
     -30,
     30,
     "coolwarm",
@@ -94,7 +94,7 @@ utils.create_distance_plot(
     segment_nztm_coords,
     p_x,
     p_y,
-    scenario_Ry,
+    scenario_ry,
     -30,
     30,
     "coolwarm",
