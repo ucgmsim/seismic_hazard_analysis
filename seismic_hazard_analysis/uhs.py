@@ -40,8 +40,8 @@ def compute_uhs(
     for cur_im, cur_period in zip(pSA_keys, pSA_periods):
         cur_result = utils.exceedance_to_im(
             np.asarray(excd_rates),
-            mean_hcurves[cur_im].index.values,
-            mean_hcurves[cur_im].values,
+            mean_hcurves[cur_im].index.values.astype(float),
+            mean_hcurves[cur_im].values.astype(float),
         )
         results[cur_period] = cur_result
 

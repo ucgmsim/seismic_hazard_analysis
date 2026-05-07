@@ -69,7 +69,7 @@ def create_ds_rupture_name(
     str
         The unique name of the rupture source
     """
-    return f"{create_ds_fault_name(lat, lon, depth)}--{mag}_{tect_type}"
+    return f"{create_ds_fault_name(lat, lon, depth)}--{mag:.1f}_{tect_type}"
 
 
 def create_ds_fault_name(lat: float, lon: float, depth: float):
@@ -90,7 +90,7 @@ def create_ds_fault_name(lat: float, lon: float, depth: float):
     str
         The unique name of the fault
     """
-    return f"{lat}_{lon}_{depth}"
+    return f"{lat:.1f}_{lon:.1f}_{depth:.1f}"
 
 
 def get_ds_source_df(background_ffp: Path):
