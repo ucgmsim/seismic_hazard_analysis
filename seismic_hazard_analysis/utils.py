@@ -297,7 +297,8 @@ def exceedance_to_im(
             np.log(hazard_values) * -1,
             np.log(im_values),
             kind="linear",
-            bounds_error=True,
+            bounds_error=False,
+            fill_value=np.nan,
         )(np.log(exceedances) * -1)
     )
 
